@@ -11,7 +11,30 @@ import '../../utils/utils.dart';
 
 // ignore: constant_identifier_names
 enum TabType { FOLLOW, APP, FEED, HOT, TOPIC, PRODUCT, COOLPIC, NONE }
+// 在 enum TabType { FOLLOW, APP, ... } 的定义之后添加
 
+extension TabTypeExtension on TabType {
+  String get displayName {
+    switch (this) {
+      case TabType.FOLLOW:
+        return '关注';
+      case TabType.APP:
+        return '应用';
+      case TabType.FEED:
+        return '推荐';
+      case TabType.HOT:
+        return '热榜';
+      case TabType.TOPIC:
+        return '话题';
+      case TabType.PRODUCT:
+        return '产品';
+      case TabType.COOLPIC:
+        return '酷图';
+      case TabType.NONE:
+        return '无';
+    }
+  }
+}
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -26,8 +49,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // late final _config = Provider.of<AppConfigProvider>(context, listen: false);
   // late bool _showFab = true; //_config.isLogin;
 
-  final _tabList = TabType.values.map((type) => Tab(text: type.name)).toList();
-
+  // final _tabList = TabType.values.map((type) => Tab(text: type.name)).toList();
+  final _tabList = TabType.values.map((type) => Tab(text: type.displayName)).toList();
   final _pages = [
     const HomeFeedPage(tabType: TabType.FOLLOW),
     if (Platform.isAndroid) const AppListPage(),
