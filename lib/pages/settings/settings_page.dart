@@ -32,6 +32,50 @@ enum FollowType { ALL, USER, TOPIC, PRODUCT, APP }
 // ignore: constant_identifier_names
 enum ImageQuality { AUTO, ORIGIN, THUMBNAIL }
 
+// 为 SettingsMenuItem 添加中文显示扩展
+extension SettingsMenuItemExtension on SettingsMenuItem {
+  String get displayName {
+    switch (this) {
+      case SettingsMenuItem.Feedback:
+        return '反馈';
+      case SettingsMenuItem.About:
+        return '关于';
+    }
+  }
+}
+
+// 为 FollowType 添加中文显示扩展
+extension FollowTypeExtension on FollowType {
+  String get displayName {
+    switch (this) {
+      case FollowType.ALL:
+        return '全部';
+      case FollowType.USER:
+        return '用户';
+      case FollowType.TOPIC:
+        return '话题';
+      case FollowType.PRODUCT:
+        return '产品';
+      case FollowType.APP:
+        return '应用';
+    }
+  }
+}
+
+// 为 ImageQuality 添加中文显示扩展
+extension ImageQualityExtension on ImageQuality {
+  String get displayName {
+    switch (this) {
+      case ImageQuality.AUTO:
+        return '自动';
+      case ImageQuality.ORIGIN:
+        return '原图';
+      case ImageQuality.THUMBNAIL:
+        return '缩略图';
+    }
+  }
+}
+
 class _SettingsPageState extends State<SettingsPage>
     with AutomaticKeepAliveClientMixin {
   @override
@@ -83,7 +127,7 @@ class _SettingsPageState extends State<SettingsPage>
             itemBuilder: (context) => SettingsMenuItem.values
                 .map((item) => PopupMenuItem<SettingsMenuItem>(
                       value: item,
-                      child: Text(item.name),
+                      child: Text(item.displayName), // 使用中文显示
                     ))
                 .toList(),
           )
@@ -204,25 +248,25 @@ class _SettingsPageState extends State<SettingsPage>
             items: FollowType.values
                 .map((type) => DropdownMenuItem<int>(
                       value: FollowType.values.indexOf(type),
-                      child: Text(type.name),
+                      child: Text(type.displayName), // 使用中文显示
                     ))
                 .toList(),
           ),
           /*
           DropDownMenuItem(
             icon: Icons.image_outlined,
-            title: 'Image Quality',
+            title: '图片质量',
             boxKey: SettingsBoxKey.imageQuality,
             items: ImageQuality.values
                 .map((type) => DropdownMenuItem<int>(
                       value: ImageQuality.values.indexOf(type),
-                      child: Text(type.name),
+                      child: Text(type.displayName), // 使用中文显示
                     ))
                 .toList(),
           ),
           const SwitchItem(
             icon: Icons.image_outlined,
-            title: 'Image Dim',
+            title: '图片暗色模式',
             boxKey: SettingsBoxKey.imageDim,
             defaultValue: true,
           ),
@@ -236,7 +280,7 @@ class _SettingsPageState extends State<SettingsPage>
           /*
           const SwitchItem(
             icon: Icons.feed_outlined,
-            title: 'Show Square',
+            title: '显示广场',
             boxKey: SettingsBoxKey.showSquare,
             defaultValue: true,
           ),
