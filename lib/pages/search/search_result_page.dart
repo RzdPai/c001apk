@@ -13,7 +13,37 @@ import '../../utils/extensions.dart';
 
 enum SearchContentType { FEED, APP, GAME, TOPIC, PRODUCT, USER }
 
+extension SearchContentTypeExtension on SearchContentType {
+  String get chineseName {
+    switch (this) {
+      case SearchContentType.FEED:
+        return '动态';
+      case SearchContentType.APP:
+        return '应用';
+      case SearchContentType.GAME:
+        return '游戏';
+      case SearchContentType.TOPIC:
+        return '话题';
+      case SearchContentType.PRODUCT:
+        return '商品';
+      case SearchContentType.USER:
+        return '用户';
+    }
+  }
+}
+
 enum SearchMenuType { Type, Sort }
+
+extension SearchMenuTypeExtension on SearchMenuType {
+  String get chineseName {
+    switch (this) {
+      case SearchMenuType.Type:
+        return '类型';
+      case SearchMenuType.Sort:
+        return '排序';
+    }
+  }
+}
 
 enum SearchType {
   ALL,
@@ -27,7 +57,49 @@ enum SearchType {
   VOTE,
 }
 
+extension SearchTypeExtension on SearchType {
+  String get chineseName {
+    switch (this) {
+      case SearchType.ALL:
+        return '全部';
+      case SearchType.FEED:
+        return '动态';
+      case SearchType.ARTICLE:
+        return '文章';
+      case SearchType.COOLPIC:
+        return '酷图';
+      case SearchType.COMMENT:
+        return '评论';
+      case SearchType.RATING:
+        return '评分';
+      case SearchType.ANSWER:
+        return '回答';
+      case SearchType.QUESTION:
+        return '问题';
+      case SearchType.VOTE:
+        return '投票';
+    }
+  }
+}
+
 enum SearchSortType { DATELINE, DEFAULT, HOT, REPLY, STRICT }
+
+extension SearchSortTypeExtension on SearchSortType {
+  String get chineseName {
+    switch (this) {
+      case SearchSortType.DATELINE:
+        return '按时间';
+      case SearchSortType.DEFAULT:
+        return '默认';
+      case SearchSortType.HOT:
+        return '按热度';
+      case SearchSortType.REPLY:
+        return '按回复';
+      case SearchSortType.STRICT:
+        return '精确匹配';
+    }
+  }
+}
 
 class SearchResultPage extends StatefulWidget {
   const SearchResultPage({super.key});
@@ -130,7 +202,7 @@ class _SearchResultPageState extends State<SearchResultPage>
                                 children: [
                                   Expanded(
                                     flex: 1,
-                                    child: Text(item.name),
+                                    child: Text(item.chineseName),
                                   ),
                                   const Icon(Icons.arrow_right)
                                 ],
@@ -147,7 +219,7 @@ class _SearchResultPageState extends State<SearchResultPage>
                 controller: _tabController,
                 tabs: SearchContentType.values
                     .map((type) => Tab(
-                          text: type.name,
+                          text: type.chineseName,
                         ))
                     .toList(),
                 onTap: (index) {
@@ -204,10 +276,16 @@ class _SearchResultPageState extends State<SearchResultPage>
           RelativeRect.fromLTRB(screenSize.width, 0, 0, screenSize.height),
       items: isSearchType
           ? SearchType.values
-              .map((type) => PopupMenuItem(value: type, child: Text(type.name)))
+              .map((type) => PopupMenuItem(
+                    value: type,
+                    child: Text(type.chineseName),
+                  ))
               .toList()
           : SearchSortType.values
-              .map((type) => PopupMenuItem(value: type, child: Text(type.name)))
+              .map((type) => PopupMenuItem(
+                    value: type,
+                    child: Text(type.chineseName),
+                  ))
               .toList(),
       elevation: 8.0,
     ).then((value) {
