@@ -54,6 +54,28 @@ jobs:
           path: build/windows/x64/runner/Release/
           compression-level: 9
 
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build
+        run: flutter build windows --release --target-platform windows-arm64
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-ARM64
+          path: build/windows/arm64/runner/Release/
+          compression-level: 9
+
   build-linux-x64:
     name: Build Linux x86-64
     runs-on: ubuntu-latest
