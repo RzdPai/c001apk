@@ -67,7 +67,7 @@ jobs:
         run: flutter pub get
 
       - name: Build
-        run: flutter build windows --release --target-platform windows-arm64
+        run: flutter build windows --release --dart-define=TARGET_ARCH=arm64 --dart-define=WINDOWS_ARCH=arm64
 
       - name: Upload
         uses: actions/upload-artifact@v4
