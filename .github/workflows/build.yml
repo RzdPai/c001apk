@@ -1,5 +1,13 @@
-paths-ignore:
-  - "README.md"
+name: Build
+
+on:
+  push:
+    paths-ignore:
+      - "README.md"
+  pull_request:
+    paths-ignore:
+      - "README.md"
+  workflow_dispatch:
 
 jobs:
   build-android:
@@ -24,7 +32,7 @@ jobs:
           name: Android
           path: build/app/outputs/flutter-apk/*.apk
 
-  build-windows:
+  build-windows-x64:
     name: Build Windows x64
     runs-on: windows-latest
     steps:
@@ -50,9 +58,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'       # 如需最新支持可改用 'main'
+          channel: stable
           cache: true
-      # 可选的 Pub 缓存，参考详细构建文件以加速依赖安装
       - name: Cache Pub dependencies
         uses: actions/cache@v4
         with:
