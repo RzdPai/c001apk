@@ -1,14 +1,10 @@
-name: Flutter Multi-Platform Build
+name: Build
 
 on:
   push:
-    branches: [ main, master ]
     paths-ignore:
-      - "README.md"
-      - "docs/**"
-      - "*.md"
+      - 'README.md'
   pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       release:
@@ -16,25 +12,9 @@ on:
         required: false
         default: 'false'
       version:
-        description: 'Release Version'
+        description: 'Release Version (overrides pubspec.yaml)'
         required: false
         default: ''
-      skip_android:
-        description: 'Skip Android build'
-        required: false
-        default: 'false'
-      skip_windows:
-        description: 'Skip Windows build'
-        required: false
-        default: 'false'
-      skip_linux:
-        description: 'Skip Linux build'
-        required: false
-        default: 'false'
-      skip_macos:
-        description: 'Skip macOS build'
-        required: false
-        default: 'false'
 
 jobs:
   version:
@@ -42,546 +22,253 @@ jobs:
     outputs:
       version: ${{ steps.info.outputs.version }}
       app_name: ${{ steps.info.outputs.app_name }}
-      DIST_WINDOWS_X64: ${{ steps.info.outputs.DIST_WINDOWS_X64 }}
-      DIST_WINDOWS_ARM64: ${{ steps.info.outputs.DIST_WINDOWS_ARM64 }}
-      DIST_LINUX_X64: ${{ steps.info.outputs.DIST_LINUX_X64 }}
-      DIST_LINUX_ARM64: ${{ steps.info.outputs.DIST_LINUX_ARM64 }}
-      DIST_MACOS_X64: ${{ steps.info.outputs.DIST_MACOS_X64 }}
-      DIST_MACOS_ARM64: ${{ steps.info.outputs.DIST_MACOS_ARM64 }}
-      DIST_ANDROID_X64: ${{ steps.info.outputs.DIST_ANDROID_X64 }}
-      DIST_ANDROID_ARM64: ${{ steps.info.outputs.DIST_ANDROID_ARM64 }}
-      DIST_ANDROID_ARM32: ${{ steps.info.outputs.DIST_ANDROID_ARM32 }}
+      windows_x64: ${{ steps.info.outputs.windows_x64 }}
+      windows_arm64: ${{ steps.info.outputs.windows_arm64 }}
+      linux_x64: ${{ steps.info.outputs.linux_x64 }}
+      linux_arm64: ${{ steps.info.outputs.linux_arm64 }}
+      macos_x64: ${{ steps.info.outputs.macos_x64 }}
+      macos_arm64: ${{ steps.info.outputs.macos_arm64 }}
+      android_arm64: ${{ steps.info.outputs.android_arm64 }}
+      android_arm32: ${{ steps.info.outputs.android_arm32 }}
+      android_x64: ${{ steps.info.outputs.android_x64 }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get version from pubspec
+      - uses: actions/checkout@v4
+      - name: Get version
         id: info
         run: |
-          # 从 pubspec.yaml 读取应用信息
-          VERSION=$(grep -m1 "version:" pubspec.yaml | cut -d' ' -f2)
-          APP_NAME=$(grep -m1 "name:" pubspec.yaml | cut -d' ' -f2 | tr -d "'" || echo "flutter_app")
-          
-          # 如果是手动输入版本，则使用输入的版本
+          APP_NAME=$(grep '^name:' pubspec.yaml | head -1 | cut -d' ' -f2 | tr -d "'" || echo "app")
+          VERSION=$(grep '^version:' pubspec.yaml | head -1 | cut -d' ' -f2)
           if [ "${{ github.event.inputs.release }}" == "true" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
           fi
-          
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "app_name=${APP_NAME}" >> $GITHUB_OUTPUT
-          echo "DIST_WINDOWS_X64=${APP_NAME}-Windows-${VERSION}-x64" >> $GITHUB_OUTPUT
-          echo "DIST_WINDOWS_ARM64=${APP_NAME}-Windows-${VERSION}-arm64" >> $GITHUB_OUTPUT
-          echo "DIST_LINUX_X64=${APP_NAME}-Linux-${VERSION}-x64" >> $GITHUB_OUTPUT
-          echo "DIST_LINUX_ARM64=${APP_NAME}-Linux-${VERSION}-arm64" >> $GITHUB_OUTPUT
-          echo "DIST_MACOS_X64=${APP_NAME}-macOS-${VERSION}-x64" >> $GITHUB_OUTPUT
-          echo "DIST_MACOS_ARM64=${APP_NAME}-macOS-${VERSION}-arm64" >> $GITHUB_OUTPUT
-          echo "DIST_ANDROID_X64=${APP_NAME}-Android-${VERSION}-x64" >> $GITHUB_OUTPUT
-          echo "DIST_ANDROID_ARM64=${APP_NAME}-Android-${VERSION}-arm64" >> $GITHUB_OUTPUT
-          echo "DIST_ANDROID_ARM32=${APP_NAME}-Android-${VERSION}-arm32" >> $GITHUB_OUTPUT
-          
-          echo "Version: ${VERSION}"
-          echo "App Name: ${APP_NAME}"
+          echo "windows_x64=${APP_NAME}-windows-${VERSION}-x64.zip" >> $GITHUB_OUTPUT
+          echo "windows_arm64=${APP_NAME}-windows-${VERSION}-arm64.zip" >> $GITHUB_OUTPUT
+          echo "linux_x64=${APP_NAME}-linux-${VERSION}-x64.tar.gz" >> $GITHUB_OUTPUT
+          echo "linux_arm64=${APP_NAME}-linux-${VERSION}-arm64.tar.gz" >> $GITHUB_OUTPUT
+          echo "macos_x64=${APP_NAME}-macos-${VERSION}-x64.dmg" >> $GITHUB_OUTPUT
+          echo "macos_arm64=${APP_NAME}-macos-${VERSION}-arm64.dmg" >> $GITHUB_OUTPUT
+          echo "android_arm64=${APP_NAME}-android-${VERSION}-arm64.apk" >> $GITHUB_OUTPUT
+          echo "android_arm32=${APP_NAME}-android-${VERSION}-arm32.apk" >> $GITHUB_OUTPUT
+          echo "android_x64=${APP_NAME}-android-${VERSION}-x64.apk" >> $GITHUB_OUTPUT
 
   build-android:
-    name: Build Android (${{ matrix.abi }})
-    needs: [version]
-    if: github.event.inputs.skip_android != 'true'
+    needs: version
     strategy:
       fail-fast: false
       matrix:
         include:
           - abi: arm64-v8a
             arch: arm64
-            target: android-arm64
           - abi: armeabi-v7a
             arch: arm32
-            target: android-arm
           - abi: x86_64
             arch: x64
-            target: android-x64
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.22.0
+          flutter-version: 3.41.1
           channel: stable
           cache: true
-          cache-key: flutter-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
-          cache-path: ${{ runner.tool_cache }}/flutter
-
       - uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'temurin'
-
-      - name: Fix Android Gradle versions
+          distribution: temurin
+      - name: Fix Android Gradle
         run: |
           cd android
-          
-          # 备份原始文件
-          cp build.gradle build.gradle.backup
-          cp app/build.gradle app/build.gradle.backup
-          
-          # 更新根目录 build.gradle
           sed -i 's/com.android.tools.build:gradle:[0-9\.]*/com.android.tools.build:gradle:8.9.1/' build.gradle
           sed -i 's/ext.kotlin_version = "[0-9\.]*"/ext.kotlin_version = "2.1.0"/' build.gradle
           sed -i 's/org.jetbrains.kotlin:kotlin-gradle-plugin:[0-9\.]*/org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0/' build.gradle
-          
-          # 更新 app/build.gradle
           sed -i 's/compileSdk [0-9]*/compileSdk 35/' app/build.gradle
-          sed -i 's/minSdkVersion [0-9]*/minSdkVersion 21/' app/build.gradle
-          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/' app/build.gradle
-          
-          # 更新 gradle wrapper
           sed -i 's/gradle-[0-9\.]*-bin.zip/gradle-8.9-bin.zip/' gradle/wrapper/gradle-wrapper.properties
-          
           cd ..
-
-      - name: Install dependencies
+      - name: Build APK
         run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs || true
-
-      - name: Build Android APK
-        run: |
-          # 清理构建缓存
           flutter clean
-          
-          # 构建特定架构的 APK
-          flutter build apk --release \
-            --target-platform=${{ matrix.target }} \
-            --split-per-abi \
-            --dart-define=BUILD_ARCH=${{ matrix.arch }} \
-            --dart-define=BUILD_NUMBER=${{ github.run_number }}
-
-      - name: Rename APK file
+          flutter pub get
+          flutter build apk --release --target-platform android-${{ matrix.arch }}
+      - name: Rename APK
         run: |
-          # 根据架构重命名 APK 文件
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/${{ needs.version.outputs.app_name }}-android-${{ needs.version.outputs.version }}-arm64.apk
+            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ${{ needs.version.outputs.android_arm64 }}
           elif [ "${{ matrix.arch }}" = "arm32" ]; then
-            cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/${{ needs.version.outputs.app_name }}-android-${{ needs.version.outputs.version }}-arm32.apk
+            cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ${{ needs.version.outputs.android_arm32 }}
           elif [ "${{ matrix.arch }}" = "x64" ]; then
-            cp build/app/outputs/flutter-apk/app-x86_64-release.apk build/app/outputs/flutter-apk/${{ needs.version.outputs.app_name }}-android-${{ needs.version.outputs.version }}-x64.apk
+            cp build/app/outputs/flutter-apk/app-x86_64-release.apk ${{ needs.version.outputs.android_x64 }}
           fi
-
-      - name: Upload Android Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: Android-${{ matrix.arch }}
-          path: |
-            build/app/outputs/flutter-apk/*${{ matrix.arch }}*.apk
-            build/app/outputs/flutter-apk/output.json
-          retention-days: 7
-          compression-level: 9
+          name: android-${{ matrix.arch }}
+          path: ${{ needs.version.outputs[format('android_{0}', matrix.arch)] }}
 
   build-windows:
-    name: Build Windows (${{ matrix.arch }})
-    needs: [version]
-    if: github.event.inputs.skip_windows != 'true'
+    needs: version
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
             runner: windows-latest
-            channel: stable
-            flutter_target: windows-x64
-            output_dir: x64
           - arch: arm64
             runner: windows-11-arm
-            channel: beta
-            flutter_target: windows-arm64
-            output_dir: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ matrix.arch == 'arm64' && '3.22.0' || '3.22.0' }}
-          channel: ${{ matrix.channel }}
+          flutter-version: 3.41.1
+          channel: stable
           cache: true
-          cache-key: flutter-windows-${{ matrix.arch }}-${{ hashFiles('pubspec.lock') }}
-
-      - name: Setup MSVC for ARM64
+      - name: Setup MSVC (ARM64 only)
         if: matrix.arch == 'arm64'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: arm64
-          uwp: false
-          spectre: true
-
-      - name: Install dependencies
+      - name: Build Windows
         run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs || true
-
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Build Windows ${{ matrix.arch }}
-        run: |
-          # 清理并构建
+          flutter config --enable-windows-desktop
           flutter clean
-          
-          echo "Building for Windows ${{ matrix.arch }}..."
-          
-          # 使用 dart-define 传递架构信息
-          flutter build windows \
-            --release \
-            --dart-define=BUILD_ARCH=${{ matrix.arch }} \
-            --dart-define=BUILD_NUMBER=${{ github.run_number }} \
-            --verbose
-          
-          # 列出构建文件确认
-          dir build/windows -Recurse
-
-      - name: Package Windows build
+          flutter pub get
+          flutter build windows --release --dart-define=ARCH=${{ matrix.arch }}
+      - name: Package
+        shell: pwsh
         run: |
-          # 创建版本特定的目录
-          $APP_NAME="${{ needs.version.outputs.app_name }}"
-          $VERSION="${{ needs.version.outputs.version }}"
-          $ARCH="${{ matrix.arch }}"
-          
-          # 确定输出目录
-          $RELEASE_DIR="build/windows/runner/Release"
-          if (Test-Path "build/windows/${{ matrix.output_dir }}/runner/Release") {
-            $RELEASE_DIR="build/windows/${{ matrix.output_dir }}/runner/Release"
+          $app = "${{ needs.version.outputs.app_name }}"
+          $ver = "${{ needs.version.outputs.version }}"
+          $arch = "${{ matrix.arch }}"
+          $dist = "dist/windows-$arch"
+          New-Item -ItemType Directory -Force -Path $dist
+          if (Test-Path "build/windows/runner/Release") {
+            $src = "build/windows/runner/Release"
+          } else {
+            $src = "build/windows/$arch/runner/Release"
           }
-          
-          # 创建分发目录
-          $DIST_DIR="dist/windows-$ARCH"
-          New-Item -ItemType Directory -Force -Path $DIST_DIR
-          
-          # 复制所有必要的文件
-          Copy-Item -Path "$RELEASE_DIR/*.exe" -Destination $DIST_DIR
-          Copy-Item -Path "$RELEASE_DIR/*.dll" -Destination $DIST_DIR
-          Copy-Item -Path "$RELEASE_DIR/data/" -Destination $DIST_DIR/data -Recurse -Force
-          
-          # 复制 README 和许可文件
-          Copy-Item -Path "README.md" -Destination $DIST_DIR -ErrorAction SilentlyContinue
-          Copy-Item -Path "LICENSE" -Destination $DIST_DIR -ErrorAction SilentlyContinue
-          
-          # 创建压缩包
-          Compress-Archive -Path "$DIST_DIR/*" -DestinationPath "build/$APP_NAME-windows-$VERSION-$ARCH.zip" -CompressionLevel Optimal
-
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+          Copy-Item "$src/*.exe" $dist
+          Copy-Item "$src/*.dll" $dist
+          Copy-Item "$src/data" $dist -Recurse -Force
+          Compress-Archive -Path "$dist/*" -DestinationPath "${{ needs.version.outputs[format('windows_{0}', matrix.arch)] }}" -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
         with:
-          name: Windows-${{ matrix.arch }}
-          path: |
-            build/${{ needs.version.outputs.app_name }}-windows-${{ needs.version.outputs.version }}-${{ matrix.arch }}.zip
-            build/windows/runner/Release/*.exe
-          retention-days: 7
-          compression-level: 9
+          name: windows-${{ matrix.arch }}
+          path: ${{ needs.version.outputs[format('windows_{0}', matrix.arch)] }}
 
   build-linux:
-    name: Build Linux (${{ matrix.arch }})
-    needs: [version]
-    if: github.event.inputs.skip_linux != 'true'
+    needs: version
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
             runner: ubuntu-latest
-            channel: stable
           - arch: arm64
             runner: ubuntu-24.04-arm
-            channel: stable
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.22.0
-          channel: ${{ matrix.channel }}
+          flutter-version: 3.41.1
+          channel: stable
           cache: true
-          cache-key: flutter-linux-${{ matrix.arch }}-${{ hashFiles('pubspec.lock') }}
-
-      - name: Install Linux dependencies
+      - name: Install deps
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            cmake \
-            ninja-build \
-            pkg-config \
-            libgtk-3-dev \
-            liblzma-dev \
-            libstdc++-12-dev \
-            libglu1-mesa-dev \
-            libegl1-mesa-dev
-            
-          # ARM64 特定依赖
+          sudo apt update
+          sudo apt install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            sudo apt-get install -y \
-              gcc-aarch64-linux-gnu \
-              g++-aarch64-linux-gnu \
-              libc6-dev-arm64-cross
+            sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           fi
-
-      - name: Install dependencies
+      - name: Build Linux
         run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs || true
-
-      - name: Enable Linux desktop
-        run: flutter config --enable-linux-desktop
-
-      - name: Build Linux ${{ matrix.arch }}
-        run: |
-          # 清理并构建
+          flutter config --enable-linux-desktop
           flutter clean
-          
-          echo "Building for Linux ${{ matrix.arch }}..."
-          
-          flutter build linux \
-            --release \
-            --dart-define=BUILD_ARCH=${{ matrix.arch }} \
-            --dart-define=BUILD_NUMBER=${{ github.run_number }} \
-            --verbose
-
-      - name: Package Linux build
+          flutter pub get
+          flutter build linux --release --dart-define=ARCH=${{ matrix.arch }}
+      - name: Package
         run: |
-          APP_NAME="${{ needs.version.outputs.app_name }}"
-          VERSION="${{ needs.version.outputs.version }}"
-          ARCH="${{ matrix.arch }}"
-          
-          # 进入构建目录
-          cd "build/linux/$ARCH/release/bundle"
-          
-          # 创建压缩包
-          tar -czf "../../../../$APP_NAME-linux-$VERSION-$ARCH.tar.gz" .
-          
-          # 返回项目根目录
-          cd ../../../../..
-
-      - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+          cd build/linux/${{ matrix.arch }}/release/bundle
+          tar -czf ../../../../${{ needs.version.outputs[format('linux_{0}', matrix.arch)] }} .
+          cd ../../../..
+      - uses: actions/upload-artifact@v4
         with:
-          name: Linux-${{ matrix.arch }}
-          path: |
-            build/${{ needs.version.outputs.app_name }}-linux-${{ needs.version.outputs.version }}-${{ matrix.arch }}.tar.gz
-            build/linux/${{ matrix.arch }}/release/bundle/
-          retention-days: 7
-          compression-level: 9
+          name: linux-${{ matrix.arch }}
+          path: ${{ needs.version.outputs[format('linux_{0}', matrix.arch)] }}
 
   build-macos:
-    name: Build macOS (${{ matrix.arch }})
-    needs: [version]
-    if: github.event.inputs.skip_macos != 'true'
+    needs: version
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            target: darwin-x64
-          - arch: arm64
-            target: darwin-arm64
+        arch: [x64, arm64]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.22.0
+          flutter-version: 3.41.1
           channel: stable
           cache: true
-          cache-key: flutter-macos-${{ matrix.arch }}-${{ hashFiles('pubspec.lock') }}
-
-      - name: Install macOS dependencies
+      - name: Install create-dmg
+        run: brew install create-dmg || true
+      - name: Build macOS
         run: |
-          brew update
-          brew install create-dmg || true
-
-      - name: Install dependencies
-        run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs || true
-
-      - name: Enable macOS desktop
-        run: flutter config --enable-macos-desktop
-
-      - name: Build macOS ${{ matrix.arch }}
-        run: |
-          # 清理并构建
+          flutter config --enable-macos-desktop
           flutter clean
-          
-          echo "Building for macOS ${{ matrix.arch }}..."
-          
-          # 设置架构特定的环境变量
+          flutter pub get
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
             export MACOSX_DEPLOYMENT_TARGET=11.0
           else
             export MACOSX_DEPLOYMENT_TARGET=10.14
           fi
-          
-          flutter build macos \
-            --release \
-            --dart-define=BUILD_ARCH=${{ matrix.arch }} \
-            --dart-define=BUILD_NUMBER=${{ github.run_number }} \
-            --verbose
-
-      - name: Create DMG for ${{ matrix.arch }}
+          flutter build macos --release --dart-define=ARCH=${{ matrix.arch }}
+      - name: Create DMG
         run: |
-          APP_NAME="${{ needs.version.outputs.app_name }}"
-          VERSION="${{ needs.version.outputs.version }}"
-          ARCH="${{ matrix.arch }}"
-          
-          # 进入应用目录
-          cd "build/macos/Build/Products/Release"
-          
-          # 创建临时目录
-          mkdir -p dmg_temp
-          cp -R "$APP_NAME.app" dmg_temp/
-          
-          # 创建 DMG
-          if command -v create-dmg &> /dev/null; then
-            create-dmg \
-              --volname "$APP_NAME $VERSION" \
-              --volicon "../../../../assets/icon.icns" \
-              --window-pos 200 120 \
-              --window-size 800 400 \
-              --icon-size 100 \
-              --icon "$APP_NAME.app" 200 190 \
-              --hide-extension "$APP_NAME.app" \
-              --app-drop-link 600 185 \
-              "../../../../build/$APP_NAME-macos-$VERSION-$ARCH.dmg" \
-              dmg_temp/
-          else
-            # 备用方案：使用 hdiutil
-            hdiutil create \
-              -volname "$APP_NAME $VERSION" \
-              -srcfolder dmg_temp \
-              -ov \
-              -format UDZO \
-              "../../../../build/$APP_NAME-macos-$VERSION-$ARCH.dmg"
-          fi
-
-      - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+          cd build/macos/Build/Products/Release
+          mkdir -p dmg
+          cp -R ${{ needs.version.outputs.app_name }}.app dmg/
+          create-dmg \
+            --volname "${{ needs.version.outputs.app_name }} ${{ needs.version.outputs.version }}" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "${{ needs.version.outputs.app_name }}.app" 200 190 \
+            --hide-extension "${{ needs.version.outputs.app_name }}.app" \
+            --app-drop-link 600 185 \
+            ../../../${{ needs.version.outputs[format('macos_{0}', matrix.arch)] }} \
+            dmg/
+      - uses: actions/upload-artifact@v4
         with:
-          name: macOS-${{ matrix.arch }}
-          path: |
-            build/${{ needs.version.outputs.app_name }}-macos-${{ needs.version.outputs.version }}-${{ matrix.arch }}.dmg
-            build/macos/Build/Products/Release/${{ needs.version.outputs.app_name }}.app
-          retention-days: 7
-          compression-level: 9
+          name: macos-${{ matrix.arch }}
+          path: build/${{ needs.version.outputs[format('macos_{0}', matrix.arch)] }}
 
   release:
-    name: Create Release
-    needs: [version, build-android, build-windows, build-linux, build-macos]
     if: github.event.inputs.release == 'true'
+    needs: [version, build-android, build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: '*'
           merge-multiple: true
-
-      - name: List downloaded artifacts
-        run: |
-          echo "Downloaded artifacts:"
-          find artifacts -type f -name "*" | sort
-          echo ""
-          echo "File sizes:"
-          find artifacts -type f -name "*" -exec du -h {} \;
-
       - name: Prepare release assets
         run: |
-          mkdir -p release_assets
-          
-          # 移动所有构建文件到发布目录
-          find artifacts -name "*.apk" -exec cp {} release_assets/ \;
-          find artifacts -name "*.zip" -exec cp {} release_assets/ \;
-          find artifacts -name "*.tar.gz" -exec cp {} release_assets/ \;
-          find artifacts -name "*.dmg" -exec cp {} release_assets/ \;
-          
-          # 重命名文件使其更友好
-          cd release_assets
-          for file in *; do
-            if [[ "$file" == *"flutter_app"* ]]; then
-              new_name="${file/flutter_app/${{ needs.version.outputs.app_name }}}"
-              mv "$file" "$new_name"
-            fi
-          done
-          
-          # 创建校验和文件
+          mkdir release
+          cp artifacts/* release/
+          cd release
           sha256sum * > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           name: Release v${{ needs.version.outputs.version }}
           tag_name: v${{ needs.version.outputs.version }}
           body: |
-            ## 🚀 Release v${{ needs.version.outputs.version }}
-            
-            ### 📦 Download Links
-            
-            | Platform | Architecture | Download |
-            |----------|--------------|----------|
-            | **Android** | ARM64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-android-${{ needs.version.outputs.version }}-arm64.apk) |
-            | **Android** | ARM32 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-android-${{ needs.version.outputs.version }}-arm32.apk) |
-            | **Windows** | x64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-windows-${{ needs.version.outputs.version }}-x64.zip) |
-            | **Windows** | ARM64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-windows-${{ needs.version.outputs.version }}-arm64.zip) |
-            | **Linux** | x64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-linux-${{ needs.version.outputs.version }}-x64.tar.gz) |
-            | **Linux** | ARM64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-linux-${{ needs.version.outputs.version }}-arm64.tar.gz) |
-            | **macOS** | x64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-macos-${{ needs.version.outputs.version }}-x64.dmg) |
-            | **macOS** | ARM64 | [下载](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/${{ needs.version.outputs.app_name }}-macos-${{ needs.version.outputs.version }}-arm64.dmg) |
-            
-            ### 🔒 Checksums
-            ```
-            $(cat release_assets/SHA256SUMS.txt)
-            ```
-            
-            ### 📝 Build Information
-            - **Build Number:** ${{ github.run_number }}
-            - **Commit:** ${{ github.sha }}
-            - **Build Date:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            
+            ## Release v${{ needs.version.outputs.version }}
+            **Build Number:** ${{ github.run_number }}
+            **Commit:** ${{ github.sha }}
+          files: release/*
           draft: false
-          prerelease: ${{ contains(needs.version.outputs.version, '-') || contains(needs.version.outputs.version, 'beta') || contains(needs.version.outputs.version, 'alpha') }}
-          files: |
-            release_assets/*
-          generate_release_notes: true
+          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  notify:
-    name: Notify Build Status
-    needs: [build-android, build-windows, build-linux, build-macos]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Build Status Summary
-        run: |
-          echo "## Build Status Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          
-          echo "| Android | ${{ needs.build-android.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Windows | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linux | ${{ needs.build-linux.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| macOS | ${{ needs.build-macos.result }} |" >> $GITHUB_STEP_SUMMARY
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Run URL:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
