@@ -1,11 +1,10 @@
-name: Build and Release
+name: Build
 
 on:
   push:
-    branches:
-      - main
     paths-ignore:
       - "README.md"
+  workflow_dispatch:
 
 jobs:
   build-android:
@@ -13,62 +12,65 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
           cache: true
+
       - uses: actions/setup-java@v4
         with:
-          java-version: 21
-          distribution: "temurin"
+          java-version: 17
+          distribution: temurin
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build APK
-        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
+        run: flutter build apk --release --split-per-abi
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Android
           path: build/app/outputs/flutter-apk/*.apk
 
-  build-windows-x64:
-    name: Build Windows x64
+  build-windows:
+    name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Build
-        run: flutter build windows --release
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-x64
-          path: build/windows/x64/runner/Release/
-          compression-level: 9
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            target: windows-x64
+            outdir: build/windows/x64/runner/Release/
+          - arch: arm64
+            target: windows-arm64
+            outdir: build/windows/arm64/runner/Release/
 
-  build-windows-arm64:
-    name: Build Windows ARM64
-    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build
-        run: flutter build windows --arm64 --release
+        run: flutter build windows --release --target-platform ${{ matrix.target }}
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-ARM64
-          path: build/windows/arm64/runner/Release/
+          name: Windows-${{ matrix.arch }}
+          path: ${{ matrix.outdir }}
           compression-level: 9
 
   build-linux-x64:
@@ -76,21 +78,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
           cache: true
+
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
+
       - name: Build
         run: flutter build linux --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-x64
+          name: Linux x86-64
           path: build/linux/x64/release/bundle/
           compression-level: 9
 
@@ -99,21 +104,25 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: main
           cache: true
+
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
+
       - name: Build
         run: flutter build linux --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-ARM64
+          name: Linux ARM64
           path: build/linux/arm64/release/bundle/
           compression-level: 9
 
@@ -122,18 +131,24 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
           cache: true
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build
         run: flutter build macos --release
-      - name: Create DMG
-        run: hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/*.app output.dmg
+
+      - name: Create Apple Disk Image (.dmg)
+        run: |
+          hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/c001apk-flutter.app c001apk.dmg
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: macOS
-          path: output.dmg
+          path: c001apk.dmg
+```
