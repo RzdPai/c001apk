@@ -1,11 +1,5 @@
-
-name: Build
-
-on:
-  push:
-    paths-ignore:
-      - "README.md"
-  workflow_dispatch:
+paths-ignore:
+  - "README.md"
 
 jobs:
   build-android:
@@ -13,22 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           cache: true
-
       - uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: temurin
-
+          distribution: "temurin"
       - name: Install dependencies
         run: flutter pub get
-
       - name: Build APK
         run: flutter build apk --release --split-per-abi
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -36,43 +25,51 @@ jobs:
           path: build/app/outputs/flutter-apk/*.apk
 
   build-windows:
-    name: Build Windows (${{ matrix.arch }})
+    name: Build Windows x64
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x64, arm64]
-        include:
-          - arch: x64
-            target: windows-x64
-            outdir: build/windows/x64/runner/Release/
-          - arch: arm64
-            target: windows-arm64
-            outdir: build/windows/arm64/runner/Release/
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
-          # 留个记号
-          channel: stable
           cache: true
-
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
-
       - name: Install dependencies
         run: flutter pub get
-
       - name: Build
-        run: flutter build windows --release --target-platform ${{ matrix.target }}
-
+        run: flutter build windows --release
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-${{ matrix.arch }}
-          path: ${{ matrix.outdir }}
+          name: Windows x64
+          path: build/windows/x64/runner/Release/
+          compression-level: 9
+
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'       # 如需最新支持可改用 'main'
+          cache: true
+      # 可选的 Pub 缓存，参考详细构建文件以加速依赖安装
+      - name: Cache Pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Pub\Cache
+          key: ${{ runner.os }}-arm64-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-pub-
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build
+        run: flutter build windows --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows ARM64
+          path: build/windows/arm64/runner/Release/
           compression-level: 9
 
   build-linux-x64:
@@ -80,20 +77,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           cache: true
-
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
-
       - name: Build
         run: flutter build linux --release
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -106,21 +99,17 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           channel: main
           cache: true
-
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
-
       - name: Build
         run: flutter build linux --release
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -133,21 +122,16 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           cache: true
-
       - name: Install dependencies
         run: flutter pub get
-
       - name: Build
         run: flutter build macos --release
-
       - name: Create Apple Disk Image (.dmg)
         run: |
           hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/c001apk-flutter.app c001apk.dmg
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
