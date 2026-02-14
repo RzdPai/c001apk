@@ -1,9 +1,14 @@
-name: Build
+name: Build and Release
 
 on:
   push:
+    branches:
+      - main
     paths-ignore:
       - "README.md"
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-android:
@@ -14,62 +19,67 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           cache: true
+
       - uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: "temurin"
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build APK
-        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
+        run: flutter build apk --release --split-per-abi
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Android
           path: build/app/outputs/flutter-apk/*.apk
 
-  build-windows:
-    name: Build Windows
+  build-windows-x64:
+    name: Build Windows x64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           cache: true
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build
         run: flutter build windows --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Windows
+          name: Windows-x64
           path: build/windows/x64/runner/Release/
           compression-level: 9
 
   build-windows-arm64:
     name: Build Windows ARM64
-    runs-on: windows-11-arm
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.24.0
-          channel: stable
           cache: true
-      - name: Setup MSVC ARM64
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: arm64
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build
-        run: flutter build windows --release
+        # Flutter 3.24+ 支持 --arm64 标志进行交叉编译
+        run: flutter build windows --arm64 --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Windows-ARM64
-          path: build/windows/runner/Release/
+          path: build/windows/arm64/runner/Release/
           compression-level: 9
 
   build-linux-x64:
@@ -80,13 +90,16 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           cache: true
+
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
+
       - name: Build
         run: flutter build linux --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -103,13 +116,16 @@ jobs:
         with:
           channel: main
           cache: true
+
       - name: Install dependencies
         run: |
           sudo apt update -y
           sudo apt install -y libgtk-3-dev
           flutter pub get
+
       - name: Build
         run: flutter build linux --release
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -125,13 +141,17 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           cache: true
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build
         run: flutter build macos --release
+
       - name: Create Apple Disk Image (.dmg)
         run: |
-          hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/c001apk-flutter.app c001apk.dmg
+          hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/*.app c001apk.dmg
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
