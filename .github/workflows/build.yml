@@ -3,272 +3,132 @@ name: Build
 on:
   push:
     paths-ignore:
-      - 'README.md'
-  pull_request:
-  workflow_dispatch:
-    inputs:
-      release:
-        description: 'Create GitHub Release'
-        required: false
-        default: 'false'
-      version:
-        description: 'Release Version (overrides pubspec.yaml)'
-        required: false
-        default: ''
+      - "README.md"
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.info.outputs.version }}
-      app_name: ${{ steps.info.outputs.app_name }}
-      windows_x64: ${{ steps.info.outputs.windows_x64 }}
-      windows_arm64: ${{ steps.info.outputs.windows_arm64 }}
-      linux_x64: ${{ steps.info.outputs.linux_x64 }}
-      linux_arm64: ${{ steps.info.outputs.linux_arm64 }}
-      macos_x64: ${{ steps.info.outputs.macos_x64 }}
-      macos_arm64: ${{ steps.info.outputs.macos_arm64 }}
-      android_arm64: ${{ steps.info.outputs.android_arm64 }}
-      android_arm32: ${{ steps.info.outputs.android_arm32 }}
-      android_x64: ${{ steps.info.outputs.android_x64 }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get version
-        id: info
-        run: |
-          APP_NAME=$(grep '^name:' pubspec.yaml | head -1 | cut -d' ' -f2 | tr -d "'" || echo "app")
-          VERSION=$(grep '^version:' pubspec.yaml | head -1 | cut -d' ' -f2)
-          if [ "${{ github.event.inputs.release }}" == "true" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "app_name=${APP_NAME}" >> $GITHUB_OUTPUT
-          echo "windows_x64=${APP_NAME}-windows-${VERSION}-x64.zip" >> $GITHUB_OUTPUT
-          echo "windows_arm64=${APP_NAME}-windows-${VERSION}-arm64.zip" >> $GITHUB_OUTPUT
-          echo "linux_x64=${APP_NAME}-linux-${VERSION}-x64.tar.gz" >> $GITHUB_OUTPUT
-          echo "linux_arm64=${APP_NAME}-linux-${VERSION}-arm64.tar.gz" >> $GITHUB_OUTPUT
-          echo "macos_x64=${APP_NAME}-macos-${VERSION}-x64.dmg" >> $GITHUB_OUTPUT
-          echo "macos_arm64=${APP_NAME}-macos-${VERSION}-arm64.dmg" >> $GITHUB_OUTPUT
-          echo "android_arm64=${APP_NAME}-android-${VERSION}-arm64.apk" >> $GITHUB_OUTPUT
-          echo "android_arm32=${APP_NAME}-android-${VERSION}-arm32.apk" >> $GITHUB_OUTPUT
-          echo "android_x64=${APP_NAME}-android-${VERSION}-x64.apk" >> $GITHUB_OUTPUT
-
   build-android:
-    needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - abi: arm64-v8a
-            arch: arm64
-          - abi: armeabi-v7a
-            arch: arm32
-          - abi: x86_64
-            arch: x64
+    name: Build Android
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.1
-          channel: stable
           cache: true
       - uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: temurin
-      - name: Fix Android Gradle
-        run: |
-          cd android
-          sed -i 's/com.android.tools.build:gradle:[0-9\.]*/com.android.tools.build:gradle:8.9.1/' build.gradle
-          sed -i 's/ext.kotlin_version = "[0-9\.]*"/ext.kotlin_version = "2.1.0"/' build.gradle
-          sed -i 's/org.jetbrains.kotlin:kotlin-gradle-plugin:[0-9\.]*/org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0/' build.gradle
-          sed -i 's/compileSdk [0-9]*/compileSdk 35/' app/build.gradle
-          sed -i 's/gradle-[0-9\.]*-bin.zip/gradle-8.9-bin.zip/' gradle/wrapper/gradle-wrapper.properties
-          cd ..
+          distribution: "temurin"
+      - name: Install dependencies
+        run: flutter pub get
       - name: Build APK
-        run: |
-          flutter clean
-          flutter pub get
-          flutter build apk --release --target-platform android-${{ matrix.arch }}
-      - name: Rename APK
-        run: |
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ${{ needs.version.outputs.android_arm64 }}
-          elif [ "${{ matrix.arch }}" = "arm32" ]; then
-            cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ${{ needs.version.outputs.android_arm32 }}
-          elif [ "${{ matrix.arch }}" = "x64" ]; then
-            cp build/app/outputs/flutter-apk/app-x86_64-release.apk ${{ needs.version.outputs.android_x64 }}
-          fi
-      - uses: actions/upload-artifact@v4
+        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          name: android-${{ matrix.arch }}
-          path: ${{ needs.version.outputs[format('android_{0}', matrix.arch)] }}
+          name: Android
+          path: build/app/outputs/flutter-apk/*.apk
 
   build-windows:
-    needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-          - arch: arm64
-            runner: windows-11-arm
-    runs-on: ${{ matrix.runner }}
+    name: Build Windows
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.1
-          channel: stable
           cache: true
-      - name: Setup MSVC (ARM64 only)
-        if: matrix.arch == 'arm64'
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build
+        run: flutter build windows --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          arch: arm64
-      - name: Build Windows
-        run: |
-          flutter config --enable-windows-desktop
-          flutter clean
-          flutter pub get
-          flutter build windows --release --dart-define=ARCH=${{ matrix.arch }}
-      - name: Package
-        shell: pwsh
-        run: |
-          $app = "${{ needs.version.outputs.app_name }}"
-          $ver = "${{ needs.version.outputs.version }}"
-          $arch = "${{ matrix.arch }}"
-          $dist = "dist/windows-$arch"
-          New-Item -ItemType Directory -Force -Path $dist
-          if (Test-Path "build/windows/runner/Release") {
-            $src = "build/windows/runner/Release"
-          } else {
-            $src = "build/windows/$arch/runner/Release"
-          }
-          Copy-Item "$src/*.exe" $dist
-          Copy-Item "$src/*.dll" $dist
-          Copy-Item "$src/data" $dist -Recurse -Force
-          Compress-Archive -Path "$dist/*" -DestinationPath "${{ needs.version.outputs[format('windows_{0}', matrix.arch)] }}" -CompressionLevel Optimal
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-${{ matrix.arch }}
-          path: ${{ needs.version.outputs[format('windows_{0}', matrix.arch)] }}
+          name: Windows
+          path: build/windows/x64/runner/Release/
+          compression-level: 9
 
-  build-linux:
-    needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x64
-            runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.1
-          channel: stable
+          channel: beta
           cache: true
-      - name: Install deps
-        run: |
-          sudo apt update
-          sudo apt install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          fi
-      - name: Build Linux
-        run: |
-          flutter config --enable-linux-desktop
-          flutter clean
-          flutter pub get
-          flutter build linux --release --dart-define=ARCH=${{ matrix.arch }}
-      - name: Package
-        run: |
-          cd build/linux/${{ matrix.arch }}/release/bundle
-          tar -czf ../../../../${{ needs.version.outputs[format('linux_{0}', matrix.arch)] }} .
-          cd ../../../..
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build
+        run: flutter build windows --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.arch }}
-          path: ${{ needs.version.outputs[format('linux_{0}', matrix.arch)] }}
+          name: Windows-ARM64
+          path: build/windows/arm64/runner/Release/
+          compression-level: 9
 
-  build-macos:
-    needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x64, arm64]
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 3.41.1
-          channel: stable
-          cache: true
-      - name: Install create-dmg
-        run: brew install create-dmg || true
-      - name: Build macOS
-        run: |
-          flutter config --enable-macos-desktop
-          flutter clean
-          flutter pub get
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            export MACOSX_DEPLOYMENT_TARGET=11.0
-          else
-            export MACOSX_DEPLOYMENT_TARGET=10.14
-          fi
-          flutter build macos --release --dart-define=ARCH=${{ matrix.arch }}
-      - name: Create DMG
-        run: |
-          cd build/macos/Build/Products/Release
-          mkdir -p dmg
-          cp -R ${{ needs.version.outputs.app_name }}.app dmg/
-          create-dmg \
-            --volname "${{ needs.version.outputs.app_name }} ${{ needs.version.outputs.version }}" \
-            --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
-            --icon "${{ needs.version.outputs.app_name }}.app" 200 190 \
-            --hide-extension "${{ needs.version.outputs.app_name }}.app" \
-            --app-drop-link 600 185 \
-            ../../../${{ needs.version.outputs[format('macos_{0}', matrix.arch)] }} \
-            dmg/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.arch }}
-          path: build/${{ needs.version.outputs[format('macos_{0}', matrix.arch)] }}
-
-  release:
-    if: github.event.inputs.release == 'true'
-    needs: [version, build-android, build-windows, build-linux, build-macos]
+  build-linux-x64:
+    name: Build Linux x86-64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
-          path: artifacts
-          merge-multiple: true
-      - name: Prepare release assets
+          cache: true
+      - name: Install dependencies
         run: |
-          mkdir release
-          cp artifacts/* release/
-          cd release
-          sha256sum * > SHA256SUMS.txt
-      - uses: softprops/action-gh-release@v1
+          sudo apt update -y
+          sudo apt install -y libgtk-3-dev
+          flutter pub get
+      - name: Build
+        run: flutter build linux --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          name: Release v${{ needs.version.outputs.version }}
-          tag_name: v${{ needs.version.outputs.version }}
-          body: |
-            ## Release v${{ needs.version.outputs.version }}
-            **Build Number:** ${{ github.run_number }}
-            **Commit:** ${{ github.sha }}
-          files: release/*
-          draft: false
-          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Linux x86-64
+          path: build/linux/x64/release/bundle/
+          compression-level: 9
+
+  build-linux-arm64:
+    name: Build Linux arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: main
+          cache: true
+      - name: Install dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y libgtk-3-dev
+          flutter pub get
+      - name: Build
+        run: flutter build linux --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux ARM64
+          path: build/linux/arm64/release/bundle/
+          compression-level: 9
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build
+        run: flutter build macos --release
+      - name: Create Apple Disk Image (.dmg)
+        run: |
+          hdiutil create -format UDZO -srcfolder build/macos/Build/Products/Release/c001apk-flutter.app c001apk.dmg
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS
+          path: c001apk.dmg
