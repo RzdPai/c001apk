@@ -11,8 +11,7 @@ jobs:
     name: Build HarmonyOS HAP
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -20,37 +19,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install DevEco CLI
+        run: |
+          npm install -g @ohos/deveco-ide-cli
+          echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+
+      - name: Verify DevEco CLI
+        run: deveco -v
+
       - name: Clone HarmonyOS Flutter SDK
         run: |
-          git clone https://gitcode.com/openharmony-tpc/flutter_flutter.git -b br_3.22.0-ohos-1.0.4 $HOME/flutter_harmonyos
+          git clone https://gitcode.com/openharmony-sig/flutter_flutter.git -b main $HOME/flutter_harmonyos
           echo "$HOME/flutter_harmonyos/bin" >> $GITHUB_PATH
 
-      - name: Verify Flutter
-        run: flutter doctor -v
-
-      - name: Download DevEco Studio CLI
+      - name: Configure DevEco SDK path
         run: |
-          wget -q https://contentcenter-drcn.dbankcdn.com/cs_umbrella_binary/DevEcoStudio3.1.0.501.zip
-          unzip -q DevEcoStudio3.1.0.501.zip -d $HOME/deveco
-          echo "$HOME/deveco/tools/ohpm/bin" >> $GITHUB_PATH
-          echo "$HOME/deveco/tools/hvigor/bin" >> $GITHUB_PATH
-          echo "$HOME/deveco/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+          mkdir -p $HOME/deveco-sdk
+          deveco config set sdk.path $HOME/deveco-sdk
+          deveco --accept-license
 
       - name: Set environment variables
         run: |
-          echo "DEVECO_SDK_HOME=$HOME/deveco/sdk" >> $GITHUB_ENV
-          echo "HOS_SDK_HOME=$HOME/deveco/sdk" >> $GITHUB_ENV
           echo "PUB_HOSTED_URL=https://pub.flutter-io.cn" >> $GITHUB_ENV
           echo "FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn" >> $GITHUB_ENV
 
       - name: Cache Pub dependencies
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.pub-cache
+          path: ~/.pub-cache
           key: ${{ runner.os }}-harmonyos-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-harmonyos-pub-
+          restore-keys: ${{ runner.os }}-harmonyos-pub-
 
       - name: Install dependencies
         run: flutter pub get
