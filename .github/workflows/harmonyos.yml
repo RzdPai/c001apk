@@ -22,7 +22,7 @@ jobs:
 
       - name: Clone HarmonyOS Flutter SDK
         run: |
-          git clone https://gitee.com/openharmony-tpc/flutter_flutter.git -b 3.27.4-ohos-1.0.3 $HOME/flutter_harmonyos
+          git clone https://gitee.com/openharmony-tpc/flutter_flutter.git -b br_3.22.0-ohos-1.0.4 $HOME/flutter_harmonyos
           echo "$HOME/flutter_harmonyos/bin" >> $GITHUB_PATH
 
       - name: Verify Flutter
