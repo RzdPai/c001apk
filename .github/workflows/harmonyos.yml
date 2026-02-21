@@ -19,29 +19,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install DevEco CLI
+      - name: Download Command Line Tools
         run: |
-          npm install -g @ohos/deveco-ide-cli
-          echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+          wget -q -O commandline-tools.zip "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/a7/v3/_xd4yU0VTkiuJeyhStv_lQ/commandline-tools-linux-x64-6.0.1.268.zip?HW-CC-KV=V1&HW-CC-Date=20260221T073401Z&HW-CC-Expire=7200&HW-CC-Sign=0E129AC3053D2262DB453AAF0D9FB73222A66B3E3A9438D55E5FAB272524171F"
+          unzip -q commandline-tools.zip -d $HOME/harmonyos
+          echo "$HOME/harmonyos/command-line-tools/bin" >> $GITHUB_PATH
 
-      - name: Verify DevEco CLI
-        run: deveco -v
+      - name: Verify tools
+        run: codelinter -v
 
       - name: Clone HarmonyOS Flutter SDK
         run: |
           git clone https://gitcode.com/openharmony-sig/flutter_flutter.git -b main $HOME/flutter_harmonyos
           echo "$HOME/flutter_harmonyos/bin" >> $GITHUB_PATH
-
-      - name: Configure DevEco SDK path
-        run: |
-          mkdir -p $HOME/deveco-sdk
-          deveco config set sdk.path $HOME/deveco-sdk
-          deveco --accept-license
 
       - name: Set environment variables
         run: |
