@@ -1,0 +1,69 @@
+name: Build HarmonyOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-harmonyos:
+    name: Build HarmonyOS HAP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download Command Line Tools
+        run: |
+          wget -q -O commandline-tools.zip "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/a7/v3/_xd4yU0VTkiuJeyhStv_lQ/commandline-tools-linux-x64-6.0.1.268.zip?HW-CC-KV=V1&HW-CC-Date=20260221T073401Z&HW-CC-Expire=7200&HW-CC-Sign=0E129AC3053D2262DB453AAF0D9FB73222A66B3E3A9438D55E5FAB272524171F"
+          unzip -q commandline-tools.zip -d $HOME/harmonyos
+          echo "$HOME/harmonyos/command-line-tools/bin" >> $GITHUB_PATH
+
+      - name: Verify tools
+        run: codelinter -v
+
+      - name: Clone HarmonyOS Flutter SDK
+        run: |
+          git clone https://gitcode.com/openharmony-sig/flutter_flutter.git -b main $HOME/flutter_harmonyos
+          echo "$HOME/flutter_harmonyos/bin" >> $GITHUB_PATH
+
+      - name: Set environment variables
+        run: |
+          echo "PUB_HOSTED_URL=https://pub.flutter-io.cn" >> $GITHUB_ENV
+          echo "FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn" >> $GITHUB_ENV
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-harmonyos-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-harmonyos-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create HarmonyOS platform
+        run: flutter create --platforms ohos .
+
+      - name: Apply plugin overrides
+        run: |
+          echo "dependency_overrides:" >> pubspec.yaml
+          echo "  shared_preferences:" >> pubspec.yaml
+          echo "    git:" >> pubspec.yaml
+          echo "      url: https://gitcode.com/openharmony-sig/flutter_packages.git" >> pubspec.yaml
+          echo "      path: packages/shared_preferences/shared_preferences" >> pubspec.yaml
+
+      - name: Build HAP
+        run: flutter build hap --release
+
+      - name: Upload HAP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmonyos-hap
+          path: build/hap/outputs/**/*.hap
